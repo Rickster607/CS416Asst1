@@ -27,7 +27,6 @@ int  sum = 0;
 
 /* A CPU-bound task to do parallel array addition */
 void parallel_calculate(void* arg) {
-	printf("inside pcalc\n");
 	int i = 0, j = 0;
 	int n = *((int*) arg);
 
@@ -41,7 +40,6 @@ void parallel_calculate(void* arg) {
 		sum += pSum[j];
 		pthread_mutex_unlock(&mutex);
 	}
-	printf("returning from pcalc\n");
 }
 
 /* verification function */

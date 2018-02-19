@@ -8,60 +8,116 @@
 
 #include "my_pthread_t.h"
 #define threadStackSize 64000
-//static my_pthread_mutex_t* m;
+
 static threadScheduler* sched;
-my_pthread_t* mainThread;
-int init = 1;
-int tid = 0;
+static struct itimerval schedTimer;
+static struct timeval systemTime;
+static my_pthread_t* mainThread;
+int priorityArr[20] = {0,1,2,3,0,1,2,0,1,0,0,1,2,3,0,1,2,0,1,0};
+static int queueLevels = 4;
+static int init = 1;
+static int tid = 0;
+int test[4];
 
 void initialize() {
+	int i;
+	for (i = 0; i < 4; i++)
+		test[i] = 0;
 	sched = malloc(sizeof(threadScheduler));
-	sched->running = malloc(sizeof(queue));
-	makeQueue(sched->running);
+	sched->running = malloc(sizeof(queue) * queueLevels);
+	for (i = 0; i < queueLevels; i++){
+		makeQueue(&(sched->running[i]));
+	}
 	sched->waiting = malloc(sizeof(queue));
 	makeQueue(sched->waiting);
 	sched->currentThread = NULL;
 	init = 0;
+
+	mainThread = malloc(sizeof(my_pthread_t));
+	getcontext(&(mainThread->ucp));
+	mainThread->ucp.uc_link = 0;
+	mainThread->ucp.uc_stack.ss_sp = malloc(threadStackSize*2);
+	mainThread->ucp.uc_stack.ss_size = threadStackSize;
+	mainThread->ucp.uc_stack.ss_flags = 0;
+	mainThread->tid = tid++;
+	mainThread->next = NULL;
+	mainThread->priority = 0;
+	mainThread->done = 0;
+
+	schedTimer.it_value.tv_sec = 0;
+	schedTimer.it_value.tv_usec = 50000;
+	schedTimer.it_interval.tv_sec = 0;
+	schedTimer.it_interval.tv_usec = 50000;
+
+	sched->currentThread = mainThread;
+	sched->running[0].head = mainThread;
+	sched->running[0].tail = mainThread;
+	sched->running[0].numThreads = 1;
+
+	//scheduleThread(mainThread, scheduler(), NULL);
 	/*
-	getcontext(&(main->ucp));
-	main = malloc(sizeof(my_pthread_t));
-	main->ucp.uc_link = 0;
-	main->ucp.uc_stack.ss_sp = malloc(threadStackSize*2);
-	main->ucp.uc_stack.ss_size = threadStackSize;
-	main->ucp.uc_stack.ss_flags = 0;
-	main->tid = tid++;
-	main->next = NULL;
-	main->priority = 0;
-	main->done = 0;
-	sched->currentThread = main;
-	sched->running->head = main;
-	sched->running->tail = main;
-	sched->running->numThreads = 1;
-	makecontext(&(main->ucp), scheduler(), 0);
-	signal(SIGALRM, scheduler);
+	//makecontext(&(mainThread->ucp), (void*)scheduleThread, 3, mainThread, (void*) scheduler(), NULL);
+
 	scheduler();
 	*/
+
+	signal(SIGALRM, myScheduler);
+	setitimer(ITIMER_REAL, &schedTimer, NULL);
+
 	return;
 }
 
-void scheduler() {
+void resetTimer(){
+	schedTimer.it_value.tv_sec = 0;
+	schedTimer.it_value.tv_usec = 50000;
+	schedTimer.it_interval.tv_sec = 0;
+	schedTimer.it_interval.tv_usec = 50000;
+	setitimer(ITIMER_REAL, &schedTimer, NULL);
+	return;
+}
 
+void stopTimer(){
+	schedTimer.it_value.tv_sec = 0;
+	schedTimer.it_value.tv_usec = 0;
+	schedTimer.it_interval.tv_sec = 0;
+	schedTimer.it_interval.tv_usec = 0;
+	setitimer(ITIMER_REAL, &schedTimer, NULL);
+	return;
+}
+
+void myScheduler() {
+	stopTimer();
+	int i;
+//printf("in the scheduler\n");
+	gettimeofday(&systemTime, NULL);
+	long int priority = priorityArr[((systemTime.tv_sec + systemTime.tv_usec) % 20)];
+	if (sched->running[priority].numThreads != 0){
+		resetTimer();
+		swapcontext(&(sched->currentThread), )
+	}
+	resetTimer();
+	return;
+}
+
+void scheduleThread(my_pthread_t* newThread){
+	printf("gotta schedule a thread\n");
+	if (sched->running[newThread->priority].numThreads == 0)
+		sched->running[newThread->priority].head = newThread;
+	else
+		sched->running[newThread->priority].head->next = newThread;
+	myScheduler();
 	return;
 }
 
 /* create a new thread */
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function)(void*), void * arg) {
-	ucontext_t mct;
-	if (init == 1)
+	if (init == 1){
 		printf("before init\n");
-		//initialize();
-		//
-	getcontext(&mct);
-	mct.uc_stack.ss_sp = malloc(threadStackSize);
-	mct.uc_stack.ss_size = threadStackSize;
+		initialize();
+		printf("after init\n");
+	}
 	getcontext(&(thread->ucp));
-	printf("after get\n");
-	thread->ucp.uc_link = &mct;
+	thread->ucp.uc_link = &(mainThread->ucp);
 	thread->ucp.uc_stack.ss_sp = malloc(threadStackSize);
 	thread->ucp.uc_stack.ss_size = threadStackSize;
 	thread->ucp.uc_stack.ss_flags = 0;
@@ -69,13 +125,13 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 	thread->next = NULL;
 	thread->priority = 0;
 	thread->done = 0;
-	makecontext(&(thread->ucp), (void*)function, 1, arg); //do I need to catch this with the scheduler?
-	printf("make\n");
-	//setcontext(&thread->ucp);
-	printf("set\n");
-	swapcontext(&mct, &thread->ucp);
-	printf("swap\n");
+	makecontext(&(thread->ucp), (void*)function, 1, arg); //do I need to catch this with the scheduler? no.
+	//scheduleThread(newThread);
+	swapcontext(&(mainThread->ucp), &thread->ucp);	//this is what needs to be done by the scheduler.
 	thread->done = 1;
+	int j;
+	for (j = 0; j < 4; j++)
+		printf("arr[%d] = %d\n", j, test[j]);
 	return 0;
 };
 

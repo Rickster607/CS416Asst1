@@ -20,6 +20,7 @@
 #include <ucontext.h>
 #include <signal.h>
 #include <errno.h>
+#include <sys/time.h>
 
 //typedef uint my_pthread_t;
 
@@ -54,9 +55,11 @@ typedef struct threadScheduler {
 
 void initialize();
 
-//void scheduler();
+void scheduler();
 
-//void scheduleThread(my_pthread_t* newThread);
+//void scheduleThread(my_pthread_t* newThread, void* function, void* args);
+
+void scheduleThread(my_pthread_t* newThread);
 
 void makeQueue(queue* newQueue);
 

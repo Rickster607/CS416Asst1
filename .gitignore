@@ -1,3 +1,6 @@
 *.a
 *.o
 .project
+Benchmark/parallelCal
+Benchmark/externalCal
+Benchmark/vectorMultiply
