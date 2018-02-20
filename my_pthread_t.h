@@ -21,14 +21,16 @@
 #include <signal.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <stddef.h>
 
 //typedef uint my_pthread_t;
 
 typedef struct my_pthread_t {
 	int tid;
-	ucontext_t ucp;
+	struct ucontext_t ucp;
 	void* retVal;
 	int priority;
+	int yielding;
 	int done;
 	struct my_pthread_t* next;
 } my_pthread_t;
@@ -47,6 +49,7 @@ typedef struct my_pthread_mutex_t {
 typedef struct threadScheduler {
 	queue* running;
 	queue* waiting;
+	queue* finished;
 	my_pthread_t* currentThread;
 } threadScheduler;
 
@@ -55,11 +58,13 @@ typedef struct threadScheduler {
 
 void initialize();
 
-void scheduler();
-
-//void scheduleThread(my_pthread_t* newThread, void* function, void* args);
+void myScheduler();
 
 void scheduleThread(my_pthread_t* newThread);
+
+void threadHandler(my_pthread_t* runningThread, void* (*function) (void*), void* arg);
+
+int isDone(int tid);
 
 void makeQueue(queue* newQueue);
 

@@ -40,6 +40,7 @@ void parallel_calculate(void* arg) {
 		sum += pSum[j];
 		pthread_mutex_unlock(&mutex);
 	}
+	//printf("yes\n");
 }
 
 /* verification function */
@@ -96,11 +97,16 @@ int main(int argc, char **argv) {
 	struct timespec start, end;
     clock_gettime(CLOCK_REALTIME, &start);
 
-	for (i = 0; i < thread_num; ++i)
+	for (i = 0; i < thread_num; ++i){
+		//printf("creating pthread %d\n", i);
 		pthread_create(&thread[i], NULL, &parallel_calculate, &counter[i]);
-
-	for (i = 0; i < thread_num; ++i)
+		//printf("pthread %d created\n", i);
+	}
+	for (i = 0; i < thread_num; ++i){
+		//printf("joining pthread %d\n", i);
 		pthread_join(thread[i], NULL);
+		//printf("pthread %d joined\n", i);
+	}
 
 	clock_gettime(CLOCK_REALTIME, &end);
     printf("running time: %lu micro-seconds\n", (end.tv_sec - start.tv_sec) * 1000 + (end.tv_nsec - start.tv_nsec) / 1000000);
